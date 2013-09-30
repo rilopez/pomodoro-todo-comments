@@ -26,20 +26,21 @@ import java.util.regex.Pattern;
 public class PomodoroCommentVSFListener implements ProjectComponent {
 
     private static TodoItem activeTodoItem;
+    private static Pattern activePattern = Pattern.compile("\\btodo \\*p[0-9]+(.+)", Pattern.CASE_INSENSITIVE);
+    private static Pattern inactivePattern = Pattern.compile("\\btodo p[0-9]+(.+)", Pattern.CASE_INSENSITIVE);
     private final Project myProject;
 
     public PomodoroCommentVSFListener(Project project) {
         myProject = project;
     }
 
-    private static void showMessage(String message, Project myProject) {
+    private static void showMessage(String message, Project myProject, MessageType messageType) {
         WindowManager windowManager = WindowManager.getInstance();
         StatusBar statusBar = windowManager.getStatusBar(myProject);
 
-
         JBPopupFactory instance = JBPopupFactory.getInstance();
 
-        instance.createHtmlTextBalloonBuilder(message, MessageType.INFO, null)
+        instance.createHtmlTextBalloonBuilder(message, messageType, null)
                 .setCloseButtonEnabled(true)
                 .setFadeoutTime(5000)
                 .createBalloon()
@@ -47,51 +48,92 @@ public class PomodoroCommentVSFListener implements ProjectComponent {
                         Balloon.Position.atRight);
     }
 
-    private static TodoItem findActivePomodoroTodoItem(TodoItem[] todoItems) {
-        Pattern pattern = Pattern.compile("\\btodo \\*p[0-9]+\\b.*", Pattern.CASE_INSENSITIVE);
-        TodoItem foundActivePomodoro = null;
+    static boolean matchActivePattern(String todoItemText) {
+        Matcher todoMatcher = activePattern.matcher(todoItemText);
+        return todoMatcher.find();
+    }
 
-        for (TodoItem todoItem : todoItems) {
-            String todoText = getTodoItemText(todoItem);
-            //looks for strings like this TODO *P0: first task
-            Matcher todoMatcher = pattern.matcher(todoText);
-            if (todoMatcher.find()) {
-                foundActivePomodoro = todoItem;
-                break;
-            }
-        }
-        return foundActivePomodoro;
+    static boolean matchInactivePattern(String todoItemText) {
+        Matcher todoMatcher = inactivePattern.matcher(todoItemText);
+        return todoMatcher.find();
     }
 
     private static String getTodoItemText(TodoItem todoItem) {
+        if (todoItem == null) return null;
         TextRange textRange = todoItem.getTextRange();
         PsiElement psiElement = todoItem.getFile().findElementAt(textRange.getStartOffset());
         return psiElement.getText();
     }
 
+    static boolean isSameTodo(String todoItemA, String todoItemB) {
+        if (todoItemA.equals(todoItemB)) {
+            return true;
+        }
+
+        String todoTextOnlyA = extractTodoTextOnly(todoItemA);
+        String todoTextOnlyB = extractTodoTextOnly(todoItemB);
+
+
+        return todoTextOnlyA.equals(todoTextOnlyB);
+    }
+
+    private static String extractTodoTextOnly(String todoItemA) {
+        if (todoItemA == null) return null;
+        Matcher matcherA;
+
+        if (todoItemA.contains("*")) {
+            matcherA = activePattern.matcher(todoItemA);
+        } else {
+            matcherA = inactivePattern.matcher(todoItemA);
+        }
+        if (matcherA.find()) {
+            return matcherA.group(1);
+        } else {
+            return todoItemA;
+        }
+    }
+
     private static void setActivePomodoro(TodoItem foundActivePomodoro, Project project) {
         activeTodoItem = foundActivePomodoro;
-        showMessage(String.format("active pomodoro detected: <strong>%s</strong>", getTodoItemText(activeTodoItem)), project);
+        showMessage(String.format("active pomodoro : <strong>%s</strong>", getTodoItemText(activeTodoItem)), project, MessageType.INFO);
+    }
+
+    private void setInactivePomodoro(String pomodoroText, Project myProject) {
+        activeTodoItem = null;
+        showMessage(String.format("stop pomodoro : <strong>%s</strong>. there are no active pomodoros", pomodoroText), myProject, MessageType.ERROR);
     }
 
     public void projectOpened() {
 
-        // Add the Virtual File listener
-        final Project project = myProject;
         VirtualFileManager.getInstance().addVirtualFileListener(new VirtualFileAdapter() {
             @Override
             public void contentsChanged(VirtualFileEvent event) {
                 PsiTodoSearchHelper todoHelper = PsiTodoSearchHelper.SERVICE.getInstance(myProject);
                 PsiFile psiFile = PsiManager.getInstance(myProject).findFile(event.getFile());
 
-                TodoItem foundActivePomodoro = findActivePomodoroTodoItem(todoHelper.findTodoItems(psiFile));
-                if (foundActivePomodoro != null) {
-                    setActivePomodoro(foundActivePomodoro, myProject);
+                TodoItem[] todoItems = getTodoItems(todoHelper, psiFile);
+                String activePomodoroText = extractTodoTextOnly(getTodoItemText(activeTodoItem));
+                for (TodoItem todoItem : todoItems) {
+                    String todoText = getTodoItemText(todoItem);
+                    String pomodoroText = extractTodoTextOnly(todoText);
+                    if (matchActivePattern(todoText)) {
+                        if (!pomodoroText.equals(activePomodoroText)) {
+                            setActivePomodoro(todoItem, myProject);
+                        }
+                        break;
+                    } else {
+                        if (matchInactivePattern(todoText) && pomodoroText.equals(activePomodoroText)) {
+                            setInactivePomodoro(todoText, myProject);
+                        }
+                    }
+
                 }
             }
         }, myProject);
+    }
 
-
+    private TodoItem[] getTodoItems(PsiTodoSearchHelper todoHelper, PsiFile psiFile) {
+        return todoHelper.findTodoItems(psiFile);
     }
 
     public void projectClosed() {
