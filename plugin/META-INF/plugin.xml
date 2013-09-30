@@ -26,14 +26,15 @@
 
   <application-components>
     <!-- Add your application components here -->
+      <component>
+          <implementation-class>com.ril.TimerEventsSourceAppComponent</implementation-class>
+      </component>
   </application-components>
 
     <project-components>
         <component>
-            <!-- Component's implementation class -->
             <implementation-class>com.ril.PomodoroCommentVSFListener</implementation-class>
-            <!-- Component's interface class -->
-            <interface-class>com.ril.PomodoroCommentVSFListener</interface-class>
+
         </component>
     </project-components>
 
