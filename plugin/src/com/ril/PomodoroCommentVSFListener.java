@@ -25,8 +25,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class PomodoroCommentVSFListener implements ProjectComponent {
-    private static final int REST_LENGTH = 5;
-    private static final int POMODORO_LENGTH = 30;
+    private static final int REST_LENGTH = 4;
+    private static final int POMODORO_LENGTH = 8;
     private static int remainingSeconds = POMODORO_LENGTH;
     private static TodoItem activeTodoItem;
     private static Pattern activePattern = Pattern.compile("\\btodo \\*p[0-9]+(.+)", Pattern.CASE_INSENSITIVE);
@@ -37,31 +37,6 @@ public class PomodoroCommentVSFListener implements ProjectComponent {
 
     public PomodoroCommentVSFListener(Project project) {
         myProject = project;
-    }
-
-    private static String formatTime(int seconds) {
-        int min = seconds / 60;
-        int sec = seconds % 60;
-        return String.format("%02d", min) + ":" + String.format("%02d", sec);
-    }
-
-    private static void showMessage(String message, Project myProject, MessageType messageType) {
-        WindowManager windowManager = WindowManager.getInstance();
-        StatusBar statusBar = windowManager.getStatusBar(myProject);
-
-        JBPopupFactory instance = JBPopupFactory.getInstance();
-
-        instance.createHtmlTextBalloonBuilder(message, messageType, null)
-                .setCloseButtonEnabled(true)
-                .setFadeoutTime(5000)
-                .createBalloon()
-                .show(RelativePoint.getCenterOf(statusBar.getComponent()),
-                        Balloon.Position.atRight);
-    }
-
-    static boolean matchActivePattern(String todoItemText) {
-        Matcher todoMatcher = activePattern.matcher(todoItemText);
-        return todoMatcher.find();
     }
 
     public void projectOpened() {
@@ -95,28 +70,27 @@ public class PomodoroCommentVSFListener implements ProjectComponent {
         VirtualFileManager.getInstance().addVirtualFileListener(new VirtualFileAdapter() {
             @Override
             public void contentsChanged(VirtualFileEvent event) {
-                PsiTodoSearchHelper todoHelper = PsiTodoSearchHelper.SERVICE.getInstance(myProject);
-                PsiFile psiFile = PsiManager.getInstance(myProject).findFile(event.getFile());
-
-                TodoItem[] todoItems = getTodoItems(todoHelper, psiFile);
-                String activePomodoroText = extractTodoTextOnly(getTodoItemText(activeTodoItem));
-                for (TodoItem todoItem : todoItems) {
-                    String todoText = getTodoItemText(todoItem);
-                    String pomodoroText = extractTodoTextOnly(todoText);
-                    if (matchActivePattern(todoText)) {
-                        if (!pomodoroText.equals(activePomodoroText)) {
-                            setActivePomodoro(todoItem, myProject);
-                        }
-                        break;
-                    } else {
-                        if (matchInactivePattern(todoText) && pomodoroText.equals(activePomodoroText)) {
-                            setInactivePomodoro(todoText, myProject);
-                        }
-                    }
-
-                }
+                //TODO leer todos los TODOs de los archivos del proyecto
+                //TODO identificar el pomodoro activo y activar timers
+                //TODO identificar cuando un pomodoro activo se cancela
             }
         }, myProject);
+    }
+
+    private static String formatTime(int seconds) {
+        int min = seconds / 60;
+        int sec = seconds % 60;
+        return String.format("%02d", min) + ":" + String.format("%02d", sec);
+    }
+
+    private static void showMessage(String message, Project myProject, MessageType messageType) {
+        //TODO mostrar el mensaje de una mejor manera
+        System.out.println("[showMessage] "+message + " !!!");
+    }
+
+    static boolean matchActivePattern(String todoItemText) {
+        Matcher todoMatcher = activePattern.matcher(todoItemText);
+        return todoMatcher.find();
     }
 
     static boolean matchInactivePattern(String todoItemText) {
