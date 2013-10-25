@@ -76,10 +76,12 @@ public class PomodoroCommentVSFListener implements ProjectComponent {
                             case RESTING:
                                 remainingSeconds = POMODORO_LENGTH;
                                 status = PomodoroStatus.IDLE;
+                                //TODO show message
                                 break;
                             case RUNNING:
                                 remainingSeconds = REST_LENGTH;
                                 status = PomodoroStatus.RESTING;
+                                //TODO increase todo pomodoro # in comment, and remove *
                                 break;
                         }
                     }
